@@ -1,12 +1,11 @@
 import os
 from dataclasses import dataclass
-import anthropic
+from groq import Groq
 from dotenv import load_dotenv
 from ragbase.store import query_store, SearchResult
 
 load_dotenv()
 
-MODEL = "claude-haiku-4-5-20251001"
 TOP_K = 5
 
 
@@ -34,14 +33,16 @@ Answer:"""
 def ask(doc_id: str, question: str) -> RAGAnswer:
     contexts = query_store(doc_id, question, top_k=TOP_K)
     prompt = _build_prompt(question, contexts)
-    client = anthropic.Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
-    message = client.messages.create(
-        model=MODEL,
-        max_tokens=1024,
+
+    client = Groq(api_key=os.environ["GROQ_API_KEY"])
+    response = client.chat.completions.create(
+        model="llama-3.3-70b-versatile",
         messages=[{"role": "user", "content": prompt}],
+        max_tokens=1024,
     )
-    answer_text = message.content[0].text
+    answer_text = response.choices[0].message.content
     source_pages = sorted({r.page for r in contexts})
+
     return RAGAnswer(
         answer=answer_text,
         source_pages=source_pages,

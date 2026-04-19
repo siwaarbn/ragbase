@@ -98,8 +98,8 @@ if prompt := st.chat_input(
     "Ask a question about the PDF…",
     disabled=st.session_state.doc_id is None,
 ):
-    if not os.environ.get("ANTHROPIC_API_KEY"):
-        st.error("Set ANTHROPIC_API_KEY in your .env file before asking questions.")
+    if not os.environ.get("GROQ_API_KEY"):
+        st.error("Set GROQ_API_KEY in your .env file before asking questions.")
         st.stop()
 
     st.session_state.messages.append({"role": "user", "content": prompt})
