@@ -1,0 +1,22 @@
+[project]
+name = "ragbase"
+version = "0.1.0"
+description = "RAG system for chatting with PDFs"
+requires-python = ">=3.11"
+dependencies = [
+    "anthropic>=0.96.0",
+    "chromadb>=1.5.8",
+    "langchain-anthropic>=1.4.1",
+    "pymupdf>=1.27.2.2",
+    "python-dotenv>=1.2.2",
+    "ragas>=0.4.3",
+    "sentence-transformers>=5.4.1",
+    "streamlit>=1.56.0",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
