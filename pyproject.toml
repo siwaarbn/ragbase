@@ -5,6 +5,7 @@ description = "RAG system for chatting with PDFs"
 requires-python = ">=3.11"
 dependencies = [
     "anthropic>=0.96.0",
+    "groq>=1.0.0",
     "chromadb>=1.5.8",
     "langchain-anthropic>=1.4.1",
     "pymupdf>=1.27.2.2",

@@ -46,7 +46,7 @@ if "doc_id" not in st.session_state:
 if "last_eval" not in st.session_state:
     st.session_state.last_eval = None
 
-st.title("📄 RAGbase")
+st.title("RAGbase")
 st.caption("Upload a PDF and ask questions about its contents.")
 
 with st.sidebar:
@@ -78,7 +78,7 @@ with st.sidebar:
             st.success(f"**{new_doc_id}** is ready.")
 
     st.divider()
-    st.caption("Powered by Claude Haiku · all-MiniLM-L6-v2 · ChromaDB")
+    st.caption("Llama 3.3 (Groq) · all-MiniLM-L6-v2 · ChromaDB")
 
 for msg in st.session_state.messages:
     if msg["role"] == "user":
@@ -141,7 +141,7 @@ if last_assistant:
     col1, col2 = st.columns([1, 3])
 
     with col1:
-        if st.button("🔍 Evaluate last answer", use_container_width=True):
+        if st.button("Evaluate last answer", use_container_width=True):
             with st.spinner("Scoring with RAGAS…"):
                 from ragbase.evaluate import score_answer
                 scores = score_answer(

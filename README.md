@@ -1,115 +1,61 @@
-# RAGbase 🧠 — Chat with any PDF
+# RAGbase
 
-> Upload a PDF, ask questions in plain English, get answers grounded in the actual pages of your document.
+> ask questions about a PDF and get answers that point back to the pages they came from
 
-[![Python](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/)
-[![Anthropic](https://img.shields.io/badge/Claude-Haiku-orange.svg)](https://anthropic.com)
-[![ChromaDB](https://img.shields.io/badge/ChromaDB-vector--store-green.svg)](https://www.trychroma.com/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+## Why I built this
 
----
+I wanted to understand retrieval-augmented generation properly, not just call a framework that hides every step. So I wrote each part myself: loading the PDF, chunking it, embedding the chunks, storing them, retrieving the right ones and building the prompt.
 
-## What is RAG?
+The part I cared about most was being able to check the answers. Every answer lists the pages it used, and there's a button that scores the last answer with RAGAS, so I can see when the model makes something up instead of guessing.
 
-**RAG** stands for **Retrieval-Augmented Generation**. Plain-English version:
+## How it works
 
-Imagine you have a giant textbook and someone asks you a question. Instead of reading the whole thing, you:
-1. **Search** the index for the most relevant pages
-2. **Read** only those pages
-3. **Write** an answer based on what you just read
-
-That's exactly what RAGbase does — automated:
-- **Retrieval**: semantic search finds the most relevant chunks of your PDF
-- **Generation**: Claude reads those chunks and writes a grounded answer
-- **Verification**: source page numbers are shown with every answer
-
----
-
-## Architecture
+1. **Load and chunk.** PyMuPDF reads the text page by page. Each page is split into chunks of roughly 512 tokens with a 50-token overlap. Every chunk keeps its page number.
+2. **Embed.** `all-MiniLM-L6-v2` from sentence-transformers turns each chunk into a vector. It runs locally, so indexing a PDF costs nothing.
+3. **Store.** ChromaDB keeps the vectors on disk in `chroma_db/`, one collection per document, using cosine distance.
+4. **Retrieve and answer.** The question is embedded the same way and the 5 closest chunks go into the prompt. The model (Llama 3.3 70B through the Groq API) is told to answer only from that context, and to say so when the answer isn't there.
+5. **Evaluate.** "Evaluate last answer" runs RAGAS faithfulness and answer relevancy on the last reply. RAGAS needs an LLM as a judge; I use Claude Haiku for that.
 
 ```
-PDF file
-    │
-    ▼
-[ingestion.py] — PyMuPDF loads pages, splits into 512-token chunks (50-token overlap)
-    │
-    ▼
-[embedder.py] — sentence-transformers all-MiniLM-L6-v2 turns each chunk into a vector
-    │
-    ▼
-[store.py] — ChromaDB persists vectors; one collection per document
-    │
-    ▼ (at query time, top-5 nearest chunks retrieved)
-    │
-[rag.py] — builds context prompt → calls Claude Haiku → returns answer + source pages
-    │
-    ▼
-[evaluate.py] — RAGAS scores the answer: faithfulness + answer relevancy
-    │
-    ▼
-[app.py] — Streamlit UI: upload, chat, source pages, evaluation button
+app.py                  Streamlit UI: upload, chat, sources, evaluation
+src/ragbase/
+  ingestion.py          PDF loading and chunking
+  embedder.py           sentence-transformers wrapper
+  store.py              ChromaDB indexing and search
+  rag.py                prompt building and the Groq call
+  evaluate.py           RAGAS scoring
 ```
 
----
+## Running it
 
-## Quick Start
-
-### Prerequisites
-- Python 3.11+
-- [uv](https://docs.astral.sh/uv/) — `pip install uv`
-- An [Anthropic API key](https://console.anthropic.com/)
-
-### Run it
+You need Python 3.11+ and [uv](https://docs.astral.sh/uv/).
 
 ```bash
-git clone https://github.com/siwaarbn/ragbase.git
+git clone https://github.com/siwaarbn/ragbase
 cd ragbase
 uv sync
-cp .env.example .env   # add your ANTHROPIC_API_KEY
+cp .env.example .env
 uv run streamlit run app.py
 ```
 
-Open `http://localhost:8501` in your browser.
+In `.env`, `GROQ_API_KEY` is required for answering. `ANTHROPIC_API_KEY` is only used by the evaluation button, so you can leave it out if you don't need scores.
 
----
+Then open `http://localhost:8501`, upload a PDF in the sidebar and start asking.
 
-## How to use it
+## Things I learned
 
-1. Upload a PDF using the sidebar
-2. Wait a few seconds while it's chunked, embedded, and indexed
-3. Type a question in the chat box
-4. Get an answer with source page numbers
-5. Click **"Evaluate last answer"** to get RAGAS faithfulness and relevancy scores
+- Chunk size mattered more than which model answered. 512 tokens with 50 overlap is a starting point, not a rule; it depends a lot on the document.
+- ChromaDB returns a distance (lower is closer), so I convert it with `score = 1 - distance` to get something that reads like a similarity.
+- RAGAS is itself LLM-based, so every evaluation costs tokens. That's why it's a button and not automatic.
+- Streamlit reruns the whole script on every click. Anything that should survive, like the chat history or the current document, has to live in `st.session_state`.
+- The first version used Claude for answering. I later switched to Groq; because the LLM call lives in one function in `rag.py`, the switch was a small change.
 
----
+## Known issues / stuff I want to fix
 
-## Tech Stack
-
-| Tool | Purpose | Why we chose it |
-|---|---|---|
-| PyMuPDF | PDF loading | Fast, handles complex layouts |
-| sentence-transformers | Embeddings | Free, runs locally, surprisingly good |
-| ChromaDB | Vector store | Simple API, persistent, no server needed |
-| Anthropic Claude Haiku | LLM answering | Fast, cheap, excellent instruction following |
-| RAGAS | Evaluation | LLM-based metrics, more meaningful than BLEU |
-| Streamlit | UI | Zero boilerplate, fast to iterate |
-
----
-
-## What I learned
-
-Building RAGbase taught me things tutorials don't cover: chunking strategy matters more than the model — a 512-token chunk with 50-token overlap is a starting point, but the right size depends on your documents. ChromaDB returns distance (lower = better) but you want a score (higher = better), so `score = 1 - distance`. RAGAS evaluation is itself LLM-powered, which means evaluation costs tokens but produces meaningful scores. And Streamlit reruns the whole script on every interaction, so you have to be deliberate about what lives in `st.session_state`.
-
----
-
-## Roadmap
-
-- [ ] Support for multiple PDFs in one session
-- [ ] Swap embedding models via UI
-- [ ] Export chat history as PDF
-- [ ] Deploy to Streamlit Cloud with one click
-
----
+- token counts are estimated from word counts, not a real tokenizer
+- scanned PDFs without a text layer give you nothing, there's no OCR
+- the collection is named after the file name, so two different PDFs with the same name overwrite each other
+- only one document at a time
 
 ## License
 
